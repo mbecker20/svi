@@ -12,9 +12,9 @@ pub fn interpolate_variables(
     input: &str,
     variables: &HashMap<String, String>,
     interpolator: Interpolator,
-) -> Result<(String, String), SviError> {
+) -> Result<(String, Vec<(String, String)>), SviError> {
     let mut result = String::new();
-    let mut replace_for_readable = Vec::new();
+    let mut replacers = Vec::new();
 
     let (double_opener, single_opener, triple_closer, double_closer) = match interpolator {
         Interpolator::DoubleCurlyBrackets => ("{{", "{", "}}}", "}}"),
@@ -49,19 +49,23 @@ pub fn interpolate_variables(
             let value = variables.get(variable).ok_or(SviError::NoValueFound {
                 variable: variable.to_string(),
             })?;
-            replace_for_readable.push((value.clone(), format!("<{variable}>")));
+            replacers.push((value.clone(), format!("<{variable}>")));
             result.push_str(value);
             result.push_str(&split2[1..].join(""));
         }
     }
+    
+    Ok((result, replacers))
+}
 
-    let mut readable = result.clone();
+pub fn replace_in_string(input: &str, replacers: &Vec<(String, String)>) -> String {
+    let mut result = input.to_string();
 
-    for (to_replace, replacer) in replace_for_readable {
-        readable = readable.replace(&to_replace, &replacer);
+    for (to_replace, replacer) in replacers {
+        result = result.replace(to_replace, replacer);
     }
 
-    Ok((result, readable))
+    result
 }
 
 #[derive(Error, Debug)]
