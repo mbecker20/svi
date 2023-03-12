@@ -17,16 +17,14 @@ let variables: HashMap<String, String> = [
 
 let to_fmt = "mongodb://[[mongo_username]]:[[mongo_password]]@127.0.0.1:27017";
 
-let (formatted, readable, replacers) = svi::interpolate_variables(to_fmt, &variables, svi::Interpolator::DoubleBrackets)?;
+let (formatted, replacers) = svi::interpolate_variables(to_fmt, &variables, svi::Interpolator::DoubleBrackets)?;
 
 println!("{formatted}"); // prints 'mongodb://root:mng233985725@127.0.0.1:27017'
+
+// makes output involving replaced variables safe to print / store
+let readable = svi::replace_in_string(&formatted, &replacers);
+
 println!("{readable}"); // prints 'mongodb://<mongo_username>:<mongo_password>@127.0.0.1:27017'
-
-// can then make any output involving these replaced variables safe to print / store
-let to_fmt = "got 'mongodb://root:mng233985725@127.0.0.1:27017'";
-let readable = svi::replace_in_string(to_fmt, &replacers);
-
-println!("{readable}"); // prints: got 'mongodb://<mongo_username>:<mongo_password>@127.0.0.1:27017'
 ```
 
 ## Escaping Interpolation
