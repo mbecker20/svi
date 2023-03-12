@@ -1,7 +1,7 @@
 # SVI
 ## *string variable interpolator*
 
-this crate contains a function that interpolates variables in a hashmap into an input string, producing both the resulting string, plus a readable string that is safe to store or print without compromising secrets.
+this crate contains a function that interpolates variables in a hashmap into an input string, producing both the resulting string, plus a vec of 'replacers' to make output safe to store or print without compromising secrets.
 
 variables can be matched with either ```[[variable_name]]``` (DoubleBrackets) or ```{{variable_name}}``` (DoubleCurlyBrackets).
 
