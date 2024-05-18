@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use thiserror::Error;
 
@@ -27,7 +27,7 @@ pub fn interpolate_variables(
   fail_on_missing_variable: bool,
 ) -> Result<(String, Vec<(String, String)>)> {
   let mut result = String::new();
-  let mut replacers = Vec::new();
+  let mut replacers = HashSet::new();
 
   let (double_opener, single_opener, triple_closer, double_closer) = match interpolator {
     Interpolator::DoubleCurlyBrackets => ("{{", "{", "}}}", "}}"),
@@ -86,7 +86,7 @@ pub fn interpolate_variables(
           // push the value onto result
           result.push_str(value);
           // add a replacer to sanitize the interpolation for logs etc.
-          replacers.push((value.clone(), format!("<{variable}>")));
+          replacers.insert((value.clone(), variable.to_string()));
         }
         (None, false) => {
           // Basically push the original back onto the result, leaving it as is.
@@ -105,7 +105,7 @@ pub fn interpolate_variables(
     }
   }
 
-  Ok((result, replacers))
+  Ok((result, replacers.into_iter().collect()))
 }
 
 pub fn replace_in_string(input: &str, replacers: &Vec<(String, String)>) -> String {
@@ -113,7 +113,7 @@ pub fn replace_in_string(input: &str, replacers: &Vec<(String, String)>) -> Stri
 
   for (to_replace, replacer) in replacers {
     // Maybe this could be done in place...
-    result = result.replace(to_replace, replacer);
+    result = result.replace(to_replace, &format!("<{replacer}>"));
   }
 
   result
