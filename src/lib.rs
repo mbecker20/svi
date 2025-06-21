@@ -108,7 +108,10 @@ pub fn interpolate_variables(
   Ok((result, replacers.into_iter().collect()))
 }
 
-pub fn replace_in_string(input: &str, replacers: &Vec<(String, String)>) -> String {
+pub fn replace_in_string<'a>(
+  input: &str,
+  replacers: impl IntoIterator<Item = &'a (String, String)>,
+) -> String {
   let mut result = input.to_string();
 
   for (to_replace, replacer) in replacers {

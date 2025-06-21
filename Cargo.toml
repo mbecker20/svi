@@ -4,14 +4,14 @@ members = ["example"]
 
 [package]
 name = "svi"
-version = "1.0.1"
-edition = "2021"
-authors = ["MoghTech"]
-description = "a function to interpolate variables in a hashmap into a format string"
+version = "1.1.0"
+edition = "2024"
+authors = ["mbecker20"]
+description = "A function to interpolate variables in a hashmap into a format string"
 repository = "https://github.com/mbecker20/svi"
 license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-thiserror = "1.0.61"
+thiserror = "2.0.12"
