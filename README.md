@@ -17,7 +17,7 @@ let variables: HashMap<String, String> = [
 
 let to_fmt = "mongodb://[[mongo_username]]:[[mongo_password]]@127.0.0.1:27017";
 
-let (formatted, replacers) = svi::interpolate_variables(to_fmt, &variables, svi::Interpolator::DoubleBrackets)?;
+let (formatted, replacers) = svi::interpolate_variables(to_fmt, &variables, svi::Interpolator::DoubleBrackets, true)?;
 
 println!("{formatted}"); // prints 'mongodb://root:mng233985725@127.0.0.1:27017'
 
