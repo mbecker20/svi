@@ -101,7 +101,7 @@ pub fn interpolate_variables(
         }
       };
       // Push the rest of contents in between the variables.
-      result.push_str(&close_split[1..].join(""));
+      result.push_str(&close_split[1..].join(double_closer));
     }
   }
 
