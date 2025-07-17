@@ -1,6 +1,20 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use thiserror::Error;
+pub type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+  #[error("split is empty.")]
+  SplitEmpty,
+  #[error(
+    "found double opener '{double_opener}{double_opener}', formatting will fail"
+  )]
+  FoundDoubleOpener { double_opener: String },
+  #[error("no closing tags for variable at index {index}")]
+  NoClosingTags { index: usize },
+  #[error("did not find any value for variable {variable}")]
+  NoValueFound { variable: String },
+}
 
 /// Choose which symbol to use as the interpolator.
 #[derive(Clone, Copy)]
@@ -29,16 +43,18 @@ pub fn interpolate_variables(
   let mut result = String::new();
   let mut replacers = HashSet::new();
 
-  let (double_opener, single_opener, triple_closer, double_closer) = match interpolator {
-    Interpolator::DoubleCurlyBrackets => ("{{", "{", "}}}", "}}"),
-    Interpolator::DoubleBrackets => ("[[", "[", "]]]", "]]"),
-  };
+  let (double_opener, single_opener, triple_closer, double_closer) =
+    match interpolator {
+      Interpolator::DoubleCurlyBrackets => ("{{", "{", "}}}", "}}"),
+      Interpolator::DoubleBrackets => ("[[", "[", "]]]", "]]"),
+    };
 
   // Split the input by double opener '{{' or '[['
-  let mut open_split = input.split(double_opener).collect::<VecDeque<_>>();
+  let mut open_split =
+    input.split(double_opener).collect::<VecDeque<_>>();
 
   // The first value in the split will be before the first variable. Push it to the result.
-  let first = open_split.pop_front().ok_or(SviError::SplitEmpty)?;
+  let first = open_split.pop_front().ok_or(Error::SplitEmpty)?;
   result.push_str(first);
 
   // Iterate through the rest of the splits.
@@ -49,7 +65,7 @@ pub fn interpolate_variables(
     // Check if the input uses a disallowed 'double opener'.
     // '{{{{' or '[[[['.
     if val.get(0..1).is_none() {
-      return Err(SviError::FoundDoubleOpener {
+      return Err(Error::FoundDoubleOpener {
         double_opener: double_opener.to_string(),
       });
     }
@@ -75,7 +91,7 @@ pub fn interpolate_variables(
 
       // a split with length <= 1 means a matching closer is not present for the opener
       if close_split.len() <= 1 {
-        return Err(SviError::NoClosingTags { index: i });
+        return Err(Error::NoClosingTags { index: i });
       }
 
       // Get the variable
@@ -95,7 +111,7 @@ pub fn interpolate_variables(
           result.push_str(double_closer);
         }
         (None, true) => {
-          return Err(SviError::NoValueFound {
+          return Err(Error::NoValueFound {
             variable: variable.to_string(),
           });
         }
@@ -122,16 +138,163 @@ pub fn replace_in_string<'a>(
   result
 }
 
-#[derive(Error, Debug)]
-pub enum SviError {
-  #[error("split is empty.")]
-  SplitEmpty,
-  #[error("found double opener '{double_opener}{double_opener}', formatting will fail")]
-  FoundDoubleOpener { double_opener: String },
-  #[error("no closing tags for variable at index {index}")]
-  NoClosingTags { index: usize },
-  #[error("did not find any value for variable {variable}")]
-  NoValueFound { variable: String },
-}
+#[cfg(test)]
+mod test {
+  use super::*;
 
-pub type Result<T> = std::result::Result<T, SviError>;
+  fn variables(vars: &[(&str, &str)]) -> HashMap<String, String> {
+    vars
+      .iter()
+      .map(|(k, v)| (k.to_string(), v.to_string()))
+      .collect()
+  }
+
+  fn replacers(replacers: &[(&str, &str)]) -> Vec<(String, String)> {
+    replacers
+      .iter()
+      .map(|(k, v)| (k.to_string(), v.to_string()))
+      .collect()
+  }
+
+  #[test]
+  fn no_vars() {
+    let source = "no variables in here";
+    let res = interpolate_variables(
+      source,
+      &Default::default(),
+      Interpolator::DoubleBrackets,
+      true,
+    )
+    .unwrap();
+    assert_eq!(res, (String::from(source), Vec::new()))
+  }
+
+  #[test]
+  fn start() {
+    let source = "[[KEY]] at the front";
+    let vars = variables(&[("KEY", "value")]);
+    let res = interpolate_variables(
+      source,
+      &vars,
+      Interpolator::DoubleBrackets,
+      true,
+    )
+    .unwrap();
+    assert_eq!(
+      res,
+      (
+        String::from("value at the front"),
+        replacers(&[("value", "KEY")])
+      )
+    )
+  }
+
+  #[test]
+  fn middle() {
+    let source = "middle [[KEY]] not at front";
+    let vars = variables(&[("KEY", "value")]);
+    let res = interpolate_variables(
+      source,
+      &vars,
+      Interpolator::DoubleBrackets,
+      true,
+    )
+    .unwrap();
+    assert_eq!(
+      res,
+      (
+        String::from("middle value not at front"),
+        replacers(&[("value", "KEY")])
+      )
+    )
+  }
+
+  #[test]
+  fn end() {
+    let source = "not at front [[KEY]]";
+    let vars = variables(&[("KEY", "value")]);
+    let res = interpolate_variables(
+      source,
+      &vars,
+      Interpolator::DoubleBrackets,
+      true,
+    )
+    .unwrap();
+    assert_eq!(
+      res,
+      (
+        String::from("not at front value"),
+        replacers(&[("value", "KEY")])
+      )
+    )
+  }
+
+  #[test]
+  fn all() {
+    let source = "[[FRONT]] at front, [[MIDDLE]] in middle, and on then the [[END]]";
+    let vars =
+      variables(&[("FRONT", "f"), ("MIDDLE", "m"), ("END", "e")]);
+    let mut res = interpolate_variables(
+      source,
+      &vars,
+      Interpolator::DoubleBrackets,
+      true,
+    )
+    .unwrap();
+    res.1.sort();
+    assert_eq!(
+      res,
+      (
+        String::from("f at front, m in middle, and on then the e"),
+        replacers(&[("e", "END"), ("f", "FRONT"), ("m", "MIDDLE")])
+      )
+    )
+  }
+
+  #[test]
+  fn escaped() {
+    let source = "[[[FRONT]]] at front, [[[MIDDLE]]] in middle, and on then the [[[END]]]";
+    let vars =
+      variables(&[("FRONT", "f"), ("MIDDLE", "m"), ("END", "e")]);
+    let res = interpolate_variables(
+      source,
+      &vars,
+      Interpolator::DoubleBrackets,
+      true,
+    )
+    .unwrap();
+    assert_eq!(
+      res,
+      (
+        String::from(
+          "[[FRONT]] at front, [[MIDDLE]] in middle, and on then the [[END]]"
+        ),
+        Vec::new()
+      )
+    )
+  }
+
+  #[test]
+  /// https://github.com/mbecker20/svi/pull/1
+  fn close_without_open() {
+    let source =
+      "mongodb://[[USERNAME]]:mongo_password]]@127.0.0.1:27017";
+    let vars = variables(&[("USERNAME", "root")]);
+    let res = interpolate_variables(
+      source,
+      &vars,
+      Interpolator::DoubleBrackets,
+      true,
+    )
+    .unwrap();
+    assert_eq!(
+      res,
+      (
+        String::from(
+          "mongodb://root:mongo_password]]@127.0.0.1:27017"
+        ),
+        replacers(&[("root", "USERNAME")])
+      )
+    )
+  }
+}
